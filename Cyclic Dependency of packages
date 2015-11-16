@@ -1,0 +1,178 @@
+#unit test used for test driven development
+import unittest
+
+#Ordered dictionary for use in PackageInstaller Class
+from collections import OrderedDict
+
+#exception in case input in cyclic
+class containsCycleException(Exception):
+	def __init__(self, value):
+		self.value = value
+	def __str__(self):
+		return repr(self.value)
+
+#Class for deciding dependencies amongst installer packages and other rules
+class PackageInstaller:
+	
+	#array of strings = initial input
+	array_of_strings = []
+	
+	#package dictionary is used for storing dependencies amongst packages : stored as key-value pairs
+	package_dictionary = {}
+	
+	#final result stored in this list - packages which have already been installed
+	result = []
+	
+	#space for intermediate storing in case a package has some other dependency
+	stack = []
+	# check variable for exception
+	flag = 0
+	
+	#instantiation of the class object with input string stored in list(array of strings input) and dictionary used as an ordered dictionary
+	def __init__(self, list):
+		self.array_of_strings = list
+		self.package_dictionary = OrderedDict()
+	
+	#Splitting the array of strings into key value pairs of the form {package:dependency}
+	def splitStrings(self):
+		for element in self.array_of_strings:
+			d = element.split(': ')
+			self.package_dictionary[d[0]] = d[1]
+	
+	#Checking to see if the input doesn't contain any cycles
+	def checkCyclicDependencies(self, package, stack):
+		if package in stack:
+			try:
+				flag = 1
+				raise containsCycleException("\nInput contains cycles! Process terminated!")
+			except containsCycleException as e:
+				print e.value + " Check input again!"
+				exit()
+		else:
+			return
+	
+	#checking the given package whether it is already present in the result i.e. whether it has already been installed or not.
+	def checkPackageInResult(self, package, result):
+		if package in result:
+			return True
+		else:
+			return False
+	
+	#checking to see if a package to be installed has dependency on another package - if no dependency is there, then install package/add package to result
+	def checkNoDependency(self, package,result):
+		if self.package_dictionary[package] == "":
+			result.append(package)
+			return True
+		else:
+			return False
+	#checking to see if the package's dependency is already installed/stored in result - if yes, then install the given package/store in result
+	def packageDependencyAlreadyInResult(self, package, result):
+		if self.package_dictionary[package] in result:
+			result.append(package)
+			return True
+		else:
+			return False
+			
+	#recursive function for resolving dependencies and deciding order		
+	def finalDependencyResolution(self, package):
+		
+		#checking for cyclic dependencies in the input
+		self.checkCyclicDependencies(package, self.stack)
+		
+		#if package already in result - return
+		if self.checkPackageInResult(package, self.result) == True:
+			return
+		
+		#empty dependency - can add to result
+		if self.checkNoDependency(package, self.result) == True:
+			return
+		
+		#if dependency already in result - can add to result
+		if self.packageDependencyAlreadyInResult(package, self.result) == True:
+			return
+		
+		else:
+			#If package not in result or has some dependency and dependency is also not installed/stored in result,
+			#store/push the current package separately onto a stack and look for its dependency via the same process recursively. When its dependency
+			#is found via any of the cases mentioned above, install the dependency and then install the initial package/add it to result
+			if self.package_dictionary[package] in self.package_dictionary.iterkeys():
+				self.stack.append(package)
+				self.finalDependencyResolution(self.package_dictionary[package])
+				self.result.append(self.stack.pop())
+				return
+	#used for separating the array of strings into a dictionary and for calling the recursive function
+	def myPackageManager(self):
+		self.splitStrings()
+		for package in self.package_dictionary.iterkeys():
+			self.finalDependencyResolution(package)
+	
+
+#TDD	
+class FooTests(unittest.TestCase):
+	
+	#Initial test case
+	#def testFoo(self):
+	#	self.failUnless(False)
+	def testSplit(self):
+		s = 'KittenService: CamelCaser'
+		self.assertEqual(s.split(': '), ['KittenService', 'CamelCaser'])
+		with self.assertRaises(TypeError):
+			s.split(2)
+	
+	def testSplitFalse(self):
+		s = 'KittenService: CamelCaser'
+		self.assertNotEqual(s.split(': '), ['CamelCaser', 'KittenService'])
+		with self.assertRaises(TypeError):
+			s.split(2)
+
+	
+	def testCheckPackageInResult(self):
+		 p = 'random'
+		 r = []
+		 self.failUnless(p not in r)
+	
+	
+	def testCheckPackageInResultFalse(self):
+		 p = 'random'
+		 r = []
+		 self.failIf(p in r)
+	
+	def testCheckNoDependency(self):
+		str = ['KittenService: CamelCaser', 'CamelCaser: ']
+		pi = PackageInstaller(str)
+		pi.splitStrings()
+		self.assertEqual(pi.checkNoDependency("CamelCaser", pi.result), True)
+		#with self.assertRaises(KeyError):
+		#	print "KEYERROR"
+	
+	def testCheckNoDependencyFalse(self):
+		str = ['KittenService: CamelCaser', 'CamelCaser: ']
+		pi = PackageInstaller(str)
+		pi.splitStrings()
+		self.assertNotEqual(pi.checkNoDependency("KittenService", pi.result), True)
+		#with self.assertRaises(KeyError):
+		#	print "KEYERROR"
+	
+#main function which is responsible for instantiating the PackageInstaller class and printing the result along with checking the testcases
+def main():
+	#array_of_strings = ['KittenService: ', 'Leetmeme: Cyberportal', 'Cyberportal: Ice', 'CamelCaser: KittenService', 'Fraudstream: Leetmeme', 'Ice: ']
+	
+	x = raw_input("Enter your string containing all comma(,) separated(followed by a space) dependencies:\nformat: 'KittenService: CamelCaser', 'CamelCaser: '\n\n")
+	
+	#removing the ,(comma) values
+	newstr = x.replace("'", "")
+	
+	array_of_strings = newstr.split(", ")
+	
+	
+	p = PackageInstaller(array_of_strings)
+	
+	p.myPackageManager()
+	
+	print "\nOUTPUT = " +  str(p.result)
+	
+	#unittest.main()
+	
+	
+if __name__ == '__main__':
+	main()
